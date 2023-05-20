@@ -1,0 +1,5 @@
+# Temporary files
+tmp/
+
+# Build folders
+build/
