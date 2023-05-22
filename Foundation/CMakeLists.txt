@@ -1,14 +1,13 @@
 
+#set(MY_REDIS_INC
+#    ./include/myRedis/Server.h
+#    ./include/myRedis/Connection.h
+#)
 
 set(MY_REDIS_SRC
-    
+    ./src/Server.cpp
+    ./src/Connection.cpp
 )
-
-set(MY_REDIS_INC
-    
-)
-
-add_subdirectory(tests)
 
 add_library(${PROJECT_NAME} STATIC ${MY_REDIS_SRC})
 target_include_directories(${PROJECT_NAME} PUBLIC "./include/")

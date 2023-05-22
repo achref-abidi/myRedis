@@ -3,3 +3,6 @@ tmp/
 
 # Build folders
 build/
+
+# Output folder
+out/
