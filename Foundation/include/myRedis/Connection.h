@@ -12,4 +12,11 @@
 #include <iostream>
 #include <cstring>
 
+#include "Servcer.h"
+
 void Connection();
+
+//
+// @brief Function for making requests and receiving responses.
+//
+int32_t query(int fd, const char *text);

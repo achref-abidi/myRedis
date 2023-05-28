@@ -1,0 +1,12 @@
+# Introduction
+This work is inspired by the book [Build your own Redis with C/C++][src_1].
+
+# Commit History
+1. Creating a `server()` function and a `client()` function to send and receive simple hello world.
+    - Commit : [6495b66][commit_1].
+    - Coincides with `Part1.03.Hello server/client` of the book [Build your own Redis with C/C++][src_1].
+
+2. 
+
+[commit_1]: https://github.com/achref-abidi/myRedis/commit/6495b66098fbe6f67a992d25168726808ce7c246
+[src_1]: https://build-your-own.org/redis/
