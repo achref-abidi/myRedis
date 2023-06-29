@@ -7,6 +7,7 @@
 set(MY_REDIS_SRC
     ./src/Server.cpp
     ./src/Connection.cpp
+    ./src/AsyncServer.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${MY_REDIS_SRC})

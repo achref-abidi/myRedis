@@ -7,9 +7,8 @@
 //
 #include "myRedis/Servcer.h"
 
-void Server()
+int setup_server()
 {
-
     //
     // Creating socket
     //
@@ -41,6 +40,16 @@ void Server()
     {
         std::cout << "error\n";
     }
+
+    return fd;
+}
+
+#ifndef EVENT_LOOP
+
+void Server()
+{
+
+    int fd = setup_server();
 
     //
     // Loop for every connection
@@ -76,6 +85,7 @@ void Server()
     }
 }
 
+#endif
 void do_something(int connectionFileDescriptor)
 {
     char readBuffer[64];
