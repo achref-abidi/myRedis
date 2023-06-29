@@ -1,4 +1,4 @@
-#include "myRedis/Connection.h"
+#include "myRedis/Client.h"
 
 int main()
 {

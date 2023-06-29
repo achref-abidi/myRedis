@@ -5,7 +5,7 @@
 // @date 21 May 2023
 // @brief
 //
-#include "myRedis/Servcer.h"
+#include "myRedis/Server.h"
 
 int setup_server()
 {

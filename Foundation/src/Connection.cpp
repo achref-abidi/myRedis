@@ -2,101 +2,181 @@
 // @file Connection.cpp
 // @headerfile Connection.h
 // @author Achref Abidi (https://github.com/achref-abidi)
-// @date 21 May 2023
+// @date 29 June 2023
 // @brief
 //
 #include "myRedis/Connection.h"
 
-void Connection()
+bool Connection::oneRequest()
 {
-    //
-    // Socket
-    //
-    int fd = socket(AF_INET, SOCK_STREAM, (int)0);
-    if (fd == -1)
-    {
-        std::cout << "error\n";
-    }
+    // parsing the len of the data
+    if (this->rbuf_size < 4)
+        return false;
 
-    //
-    // connect
-    //
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
-    addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK); // 127.0.0.1
+    int32_t len;
+    memcpy(&len, this->rbuf, 4);
 
-    int rv = connect(fd, (const sockaddr *)&addr, sizeof((addr)));
-    if (rv)
-    {
-        std::cout << "errro\n";
-    }
+    // reading len bytes of data
+    if (this->rbuf_size < len)
+        return false;
+    // no suffisiant data is read
 
-    uint32_t err = query(fd, "Hello1");
-    if (err)
-        std::cout << "error\n";
-    err = query(fd, "Hello2");
-    if (err)
-        std::cout << "error\n";
-
-    err = query(fd, "Hello3");
-    if (err)
-        std::cout << "error\n";
-
-    close(fd);
-}
-
-int32_t query(int fd, const char *text)
-{
-    uint32_t len = (uint32_t)strlen(text);
     if (len > k_max_msg)
     {
-        return -1;
+        LOG("[INFO] The received data is too long");
+        // return true;
     }
 
-    // Constructing the message frame according to our protocol
-    char wbuf[4 + k_max_msg];
-    memcpy(wbuf, &len, 4); // assume little endian
-    memcpy(&wbuf[4], text, len);
+    uint8_t a_request[k_max_msg];
+    memcpy(a_request, this->rbuf + 4, len);
 
-    // sending the message
-    if (int32_t err = write_full(fd, wbuf, 4 + len))
+    // do something with the request
+    a_request[len] = '\0';
+    LOG("[INFO] Received message : " + std::string((char *)a_request));
+
+    // sort of freeing those 4 bytes that have been read
+    auto remain = this->rbuf_size - len - 4;
+    if (remain > 0)
     {
-        return err;
+        memmove(this->rbuf, this->rbuf + 4 + len, remain);
     }
+    this->rbuf_size = remain;
 
-    // Reading server response
-    char rbuf[4 + k_max_msg + 1];
-    errno = 0;
-    int32_t err = read_full(fd, rbuf, 4);
-    if (err)
+    // Reply to the request by inserting an echo message
+    memcpy(this->wbuf + this->wbuf_size, &len, 4);
+    memcpy(this->wbuf + this->wbuf_size + 4, a_request, len);
+    this->wbuf_size += 4 + len;
+
+    this->state = STATE_RES;
+    // after reading the request we need to send a response
+    //
+
+    LOG("[INFO] Echoing the received request...");
+    while (this->flushBuffer())
+        ;
+
+    return this->state == STATE_REQ; // Return to the outer loop when the
+    // response is done processing
+}
+
+bool Connection::fillBuffer()
+{
+    LOG("[INFO] attempting to read from socket fd.");
+
+    // conn.rbuf_size will mark the currently read bytes.
+    // i.e it will serve as an index.
+    auto &end_of_rbuf = this->rbuf_size;   // i.e actual len of rbuf
+    auto len_of_rbuf = sizeof(this->rbuf); // Fixed from the start.
+
+    assert(end_of_rbuf < len_of_rbuf); // make sure that ???
+
+    ssize_t retval = 0;
+    do
     {
-        if (errno == 0)
+        size_t remainingBytes = len_of_rbuf - end_of_rbuf;
+        retval = read(this->fd, this->rbuf + end_of_rbuf, remainingBytes);
+        /// @note If read() has not read any data yet, it returns -1 and sets errno to EINTR
+    } while (retval < 0 && errno == EINTR);
+    // We loop over `read()` system call until
+    // relval >= 0 or
+    // when error has occured due to EAGAIN
+
+    //
+    // Handling retval
+    //
+    if (retval < 0 && errno == EAGAIN)
+    {
+        // If some process has the socket open for writing and
+        // O_NONBLOCK is set to 1, read() returns -1 and
+        // sets errno to EAGAIN.
+        LOG("[INFO] Other process is using the current opened socket.");
+        return false;
+    }
+    // else if not EAGAIN ... (other errors)
+    if (retval < 0)
+    {
+        LOG("[ERROR] Unable to read from the socket due to `" + std::string(strerror(errno)) + " `");
+        this->state = STATE_END;
+        return false;
+    }
+    // else if zero bytes are been read ...
+    if (retval == 0)
+    {
+        if (end_of_rbuf > 0)
         {
-            std::cout << "EOF\n";
+            LOG("[ERROR] Unexpected EOF.");
         }
         else
         {
-            std::cout << "Error while reading\n";
+            LOG("[INFO] Reached EOF");
         }
-        return err;
+        this->state = STATE_END;
+        return false;
     }
 
-    memcpy(&len, rbuf, 4); // assume little endian
-    if (len > k_max_msg)
+    //
+    // ELSE retval > 0
+    //
+
+    // Incrementing the end of rbuf for the next read
+    end_of_rbuf += (size_t)retval;
+
+    assert(end_of_rbuf <= len_of_rbuf - end_of_rbuf);
+
+    // since the received message can have multiple
+    // requests (pipelining).
+    while (this->oneRequest())
+        ;
+    /// @note in contrast to read_full we need to process the
+    /// the received data as soon as we read it.
+    // in order to free some space in the rbuff.
+
+    return (this->state == STATE_REQ);
+    // this function is intented to be called inside a loop
+    // as long as it is possible to read new data
+    // i.e the state of the connection should permit it
+}
+
+bool Connection::flushBuffer()
+{
+    ssize_t retval = 0;
+    do
     {
-        std::cout << "Too long\n";
-        return -1;
-    }
+        size_t remainingBytes = this->wbuf_size - this->wbuf_sent;
+        retval = write(this->fd, this->wbuf + this->wbuf_sent, remainingBytes);
+    } while (retval < 0 && errno == EINTR);
 
-    err = read_full(fd, &rbuf[4], len);
-    if (err)
+    //
+    // Handling error
+    //
+    if (retval < 0 && errno == EAGAIN)
     {
-        std::cout << "Read error\n";
+        LOG("[INFO] Other process is using the current opened socket.");
+        return false;
     }
 
-    rbuf[4 + len] = '\0';
-    std::cout << "Server says: " << &rbuf[4] << std::endl;
+    if (retval < 0)
+    {
+        LOG("[ERROR] Unable to write to the socket due to `" + std::string(strerror(errno)) + " `");
+        this->state = STATE_END;
+        return false;
+    }
 
-    return 0;
+    //
+    // ELSE retval >= 0
+    //
+    this->wbuf_sent += retval;
+    assert(this->wbuf_sent <= this->wbuf_size);
+
+    if (this->wbuf_sent == this->wbuf_size)
+    {
+        LOG("[INFO] No more data to write");
+        this->state = STATE_REQ; // switch back to request state => the this-> is readable
+        this->wbuf_sent = 0;
+        this->wbuf_size = 0;
+        return false;
+    }
+
+    // still more data to write
+    return true;
 }

@@ -1,8 +1,9 @@
-#include "myRedis/Servcer.h"
-#define EVENT_LOOP
+#include "myRedis/AsyncServer.h"
 
 int main()
 {
-    Server();
+    AsyncServer server;
+    server.run();
+
     return 0;
 }
