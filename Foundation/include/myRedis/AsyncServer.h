@@ -21,12 +21,13 @@ using Conn = Connection;
 using connection_map = std::unordered_map<int, Conn>;
 using pollfd = struct pollfd;
 
+//
 // @brief Holds the definition of `server()` function and it's helper functions.
 // The implementation of different functions are done to be used
 // in an event loop.
+//
 class AsyncServer
 {
-
 public:
     AsyncServer();
     ~AsyncServer();
@@ -50,9 +51,9 @@ public:
     void accept_new_connection(int fd);
 
 private:
-    int listening_fd = 0;
-    connection_map conn_map;
-    std::vector<pollfd> all_fds;
+    int listening_fd = 0;           ///< Initial listening fd
+    connection_map conn_map;        ///< Collection of only the connected fds
+    std::vector<pollfd> all_fds;    ///< Collection of all created fds
 };
 
 inline AsyncServer::~AsyncServer()

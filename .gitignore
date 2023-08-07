@@ -1,8 +1,12 @@
+# Editors files
+.idea/
+
 # Temporary files
 tmp/
 
 # Build folders
 build/
+cmake-build-debug/
 
 # Output folder
 out/

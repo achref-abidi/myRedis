@@ -7,15 +7,15 @@
 //
 #include "myRedis/Client.h"
 
-void Connection()
-{
+bool Application::initConnection() {
     //
     // Socket
     //
-    int fd = socket(AF_INET, SOCK_STREAM, (int)0);
-    if (fd == -1)
+    m_fd = socket(AF_INET, SOCK_STREAM, (int)0);
+    if (m_fd == -1)
     {
         std::cout << "error\n";
+        return false;
     }
 
     //
@@ -26,77 +26,78 @@ void Connection()
     addr.sin_port = ntohs(1234);
     addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK); // 127.0.0.1
 
-    int rv = connect(fd, (const sockaddr *)&addr, sizeof((addr)));
+    int rv = connect(m_fd, (const sockaddr *)&addr, sizeof((addr)));
     if (rv)
     {
         std::cout << "errro\n";
+        return false;
     }
 
-    uint32_t err = query(fd, "Hello1");
-    if (err)
-        std::cout << "error\n";
-    err = query(fd, "Hello2");
-    if (err)
-        std::cout << "error\n";
-
-    err = query(fd, "Hello3");
-    if (err)
-        std::cout << "error\n";
-
-    close(fd);
+    return true;
 }
 
-int32_t query(int fd, const char *text)
-{
-    uint32_t len = (uint32_t)strlen(text);
-    if (len > k_max_msg)
-    {
-        return -1;
-    }
+bool Application::closeConnection() {
+    close(m_fd);
+    return true;
+}
+
+bool Application::get(const std::string &key, myRedis::str::Response& res) {
+    return query({"get", key}, res);
+}
+
+bool Application::query(const std::vector<std::string> &q, myRedis::str::Response& res, int nbr_cmd) {
+    myRedis::SIZE_T len;
 
     // Constructing the message frame according to our protocol
-    char wbuf[4 + k_max_msg];
-    memcpy(wbuf, &len, 4); // assume little endian
-    memcpy(&wbuf[4], text, len);
+    char wbuf[4 + myRedis::k_max_msg];
+
+    myRedis::str::encode_request(wbuf, len, q);
 
     // sending the message
-    if (int32_t err = write_full(fd, wbuf, 4 + len))
+    if (int32_t err = write_full(m_fd, wbuf, len)) ///TODO: use Connection flushBuffer function
     {
         return err;
     }
 
-    // Reading server response
-    char rbuf[4 + k_max_msg + 1];
-    errno = 0;
-    int32_t err = read_full(fd, rbuf, 4);
-    if (err)
-    {
-        if (errno == 0)
-        {
-            std::cout << "EOF\n";
+    while(nbr_cmd > 0) {
+        // Reading server response len
+        char rbuf[4 + myRedis::k_max_msg + 1];
+        errno = 0;
+        int32_t err = read_full(m_fd, rbuf, sizeof(myRedis::SIZE_T));
+        if (err) {
+            if (errno == 0) {
+                std::cout << "EOF\n";
+            } else {
+                std::cout << "Error while reading\n";
+            }
+            return err;
         }
-        else
-        {
-            std::cout << "Error while reading\n";
+
+        myRedis::SIZE_T res_len; //i.e header
+        memcpy(&res_len, rbuf, sizeof(myRedis::SIZE_T));
+        err = read_full(m_fd, rbuf + sizeof(myRedis::SIZE_T), res_len);
+        if (err) {
+            if (errno == 0) {
+                std::cout << "EOF\n";
+            } else {
+                std::cout << "Error while reading\n";
+            }
+            return err;
         }
-        return err;
+
+        //myRedis::str::Response res {};
+        res = {};
+        myRedis::str::decode_response(rbuf, res);
+
+        nbr_cmd--;
     }
-
-    memcpy(&len, rbuf, 4); // assume little endian
-    if (len > k_max_msg)
-    {
-        std::cout << "Too long\n";
-        return -1;
-    }
-
-    err = read_full(fd, &rbuf[4], len);
-    if (err)
-    {
-        std::cout << "Read error\n";
-    }
-
-    rbuf[4 + len] = '\0';
-    std::cout << "Server says: " << &rbuf[4] << std::endl;
-
     return 0;
+}
+
+bool Application::set(const std::string &key, const std::string &value, myRedis::str::Response& res) {
+    return query({"set", key, value}, res);
+}
+
+bool Application::del(const std::string &key, myRedis::str::Response& res) {
+    return query({"del", key}, res);
 }

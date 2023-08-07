@@ -14,6 +14,8 @@
 #include <cstring>
 #include "myRedis/Includes.h"
 
+#include "Core.h"
+
 //
 // @brief Main function for the server
 //
@@ -51,9 +53,3 @@ int32_t read_full(int connFd, char *buff, int n);
 // @param n number of bytes to write.
 //
 int32_t write_full(int connFd, char *buff, int n);
-
-//
-// @brief Just a simple function to manipulate a received response
-// @note This function is decapretated.
-//
-void do_something(int connectionFileDescriptor);

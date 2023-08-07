@@ -161,7 +161,7 @@ int32_t one_request(int connFd)
     // each request from the others.
     //
 
-    char rbuf[4 + k_max_msg + 1]; // 4 bytes header
+    char rbuf[4 + myRedis::k_max_msg + 1]; // 4 bytes header
 
     errno = 0;
 
@@ -181,7 +181,7 @@ int32_t one_request(int connFd)
 
     uint32_t len = 0;
     memcpy(&len, rbuf, 4); // assume little endian
-    if (len > k_max_msg)
+    if (len > myRedis::k_max_msg)
     {
         std::cout << "Message is too long\n";
         return -1;

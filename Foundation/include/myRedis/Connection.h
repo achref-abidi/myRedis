@@ -12,6 +12,12 @@
 #include <cassert>  ///< For assert macro.
 #include <cstdint>  ///< For fixed width integer types.
 #include <string>
+#include <vector>
+#include <unordered_map>
+
+#include "Core.h"
+
+static std::unordered_map<std::string , std::string> m_server_data;
 
 // the file descriptor returned by a socket related system call,
 // does not provide us with much information on the connection
@@ -27,6 +33,15 @@ public:
         STATE_END = 2  ///< Mark the connection for deletion (in case of errors).
     };
 
+    enum ret_code{
+        CREATED,
+        UPDATED,
+        FOUND,
+        DELETED,
+        NOT_FOUND,
+        UNKNOWN_ERROR
+    };
+
 public:
     //
     // @brief Default Constructor
@@ -37,6 +52,7 @@ public:
     // Closes the open file descriptor.
     //
     virtual ~Connection();
+
     //
     // @brief Similar to `read_full` function but it is implemented
     // to be used with non blocking read.
@@ -59,17 +75,6 @@ public:
     // @return false if there is no more data to write or an error occured.
     //
     bool flushBuffer();
-
-    //
-    // @brief Parses a single request out of the received ones.
-    //
-    // @note This function should be called inside a while loop
-    // to parse all available requests.
-    //
-    // @return true if there is more requests to parse.
-    // @return false if there is no requests to parse or in case of an error.
-    //
-    bool oneRequest();
 
     //
     // @brief This will operate on the client depending on its state,
@@ -98,15 +103,40 @@ public:
         }*/
     }
 
+    //
+    // @brief To handle the received commands.
+    // @return false if the request processing id done
+    //
+    bool parse_commands(uint8_t* request, size_t len);
+
+protected:
+    //
+    // @brief Parses a single request out of the received ones.
+    //
+    // @note This function should be called inside a while loop
+    // to parse all available requests.
+    //
+    // @return true if there is more requests to parse.
+    // @return false if there is no requests to parse or in case of an error.
+    //
+    bool oneRequest();
+
+    //
+    //
+    //
+    ret_code cmd_set(const std::string& key, const std::string& value);
+    ret_code cmd_get(const std::string& key, std::string& ret_value);
+    ret_code cmd_del(const std::string& key);
+
 public:
     int fd = -1;        ///< connection file descriptor.
     uint32_t state = 0; ///< state used to decide what to do with the connection.
     ///< One connection socket is either readable or writable.
-    size_t rbuf_size = 0;        ///< size of the reading buffer
-    uint8_t rbuf[4 + k_max_msg]; ///< Buffer for reading.
-    size_t wbuf_size = 0;        ///< size of the writing buffer
-    size_t wbuf_sent = 0;        ///< Size of the sended data.
-    uint8_t wbuf[4 + k_max_msg]; ///< Buffer for writing.
+    myRedis::SIZE_T rbuf_size = 0;        ///< size of the reading buffer
+    myRedis::BYTE_T rbuf[4 + myRedis::k_max_msg]; ///< Buffer for reading.
+    myRedis::SIZE_T wbuf_size = 0;        ///< size of the writing buffer
+    myRedis::SIZE_T wbuf_sent = 0;        ///< Size of the sended data.
+    myRedis::BYTE_T wbuf[4 + myRedis::k_max_msg]; ///< Buffer for writing.
 };
 
 inline Connection::~Connection()

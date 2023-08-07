@@ -10,8 +10,6 @@
 
 #include <iostream>
 
-const size_t k_max_msg = 4096; ///< Equals to 4 KBytes of data.
-
 #define DEBUG
 
 #ifdef DEBUG
